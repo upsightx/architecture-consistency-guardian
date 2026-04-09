@@ -79,16 +79,22 @@ architecture-consistency-guardian/
 
 ## 安装
 
-复制到 OpenClaw skills 目录:
+### ClawHub（推荐）
+
+```bash
+clawhub install architecture-consistency-guardian
+```
+
+### skills.sh
+
+```bash
+npx skills add upsightx/architecture-consistency-guardian
+```
+
+### 手动安装
 
 ```bash
 cp -r architecture-consistency-guardian ~/.openclaw/skills/
-```
-
-或通过 `.skill` 包安装:
-
-```bash
-openclaw skill install architecture-consistency-guardian.skill
 ```
 
 ## License
