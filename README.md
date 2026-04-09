@@ -1,71 +1,71 @@
 # Architecture Consistency Guardian
 
-An [OpenClaw](https://github.com/openclaw/openclaw) skill that enforces system-wide consistency before code changes. It transforms the default "patch the error site" behavior into a disciplined "scan globally → identify source of truth → modify as a group → audit for residue → verify" workflow.
+一个 [OpenClaw](https://github.com/openclaw/openclaw) Skill，在代码修改前强制执行全局一致性检查。将默认的"哪里报错修哪里"行为，转变为"全局扫描 → 识别唯一真源 → 成组修改 → 残留审计 → 回归验证"的标准化工作流。
 
-## Problem
+## 解决什么问题
 
-When AI agents (or humans) fix code, they tend to:
-- Fix only the current file, ignoring callers, config, docs, and tests
-- Rename a variable in one place but leave the old name in 10 others
-- Fix a state machine branch without checking if other modules use stale status values
-- Update a path in config but leave hardcoded copies elsewhere
-- Remove a legacy module but keep silent fallbacks that route back to it
-- Report "fixed" without checking what old logic is still alive
+AI Agent（或人类）修代码时，常见的坏习惯：
+- 只改当前文件，不管调用方、配置层、文档和测试
+- 在一个地方改了变量名，其他 10 个地方还是旧名字
+- 修了一个状态机分支，没检查其他模块是否还在用旧状态值
+- 更新了配置路径，但硬编码的副本散落各处
+- 删了旧模块，但 fallback 分支还在静默地把流量导回去
+- 报告"已修复"，却没检查旧逻辑是否还活着
 
-This skill forces a **global-first posture** for every change that touches shared contracts.
+这个 Skill 强制要求：**改代码前先看全局**。
 
-## When to Use
+## 适用场景
 
-- Unifying variable/field/parameter names across files
-- Consolidating state machines (status values, transitions, write-back entries)
-- Cleaning legacy paths, fallbacks, or retired modules
-- Aligning configuration sources (DB paths, env vars, runtime config)
-- Syncing documentation with code after refactoring
-- Any bug fix where the root cause might be contract drift
+- 跨文件统一变量/字段/参数命名
+- 状态机收口（统一状态值、迁移规则、写回入口）
+- 清理 legacy 路径、fallback、已退役模块
+- 统一配置来源（数据库路径、环境变量、运行时配置）
+- 重构后同步文档与代码
+- 修 bug 时发现根因可能是架构契约漂移
 
-## Mandatory 8-Phase Workflow
+## 强制 8 阶段工作流
 
-1. **Classify** — Determine the consistency category (naming, state-machine, config-path, etc.)
-2. **Identify Source of Truth** — Find the canonical file; flag competing sources
-3. **Global Scan** — Search ALL references, not just the current file
-4. **Modification Plan** — List affected files and changes before touching code
-5. **Grouped Execution** — Modify source of truth → callers → config → compat → tests → docs
-6. **Residue Audit** — Search for old names, old states, old paths, old fallbacks still present
-7. **Regression Verification** — Run tests, grep for zero old-name hits, validate config resolution
-8. **Structured Report** — Output: source of truth, scope, changes, residual compat, verification results
+1. **归类** — 判断一致性问题类别（命名、状态机、配置路径等）
+2. **识别唯一真源** — 找到权威文件，标记竞争真源
+3. **全局扫描** — 搜索所有引用，不只看当前文件
+4. **修改计划** — 列出受影响文件和具体改动，再动手
+5. **成组执行** — 按顺序：真源 → 调用方 → 配置层 → 兼容层 → 测试 → 文档
+6. **残留审计** — 搜索旧名称、旧状态、旧路径、旧 fallback 是否仍存在
+7. **回归验证** — 跑测试、grep 旧名称零命中、验证配置解析
+8. **结构化报告** — 输出：唯一真源、影响范围、已改内容、残留兼容层、验证结果
 
-## Bundled Scripts
+## 内置脚本
 
-| Script | Purpose |
-|--------|---------|
-| `scripts/grep_legacy.py` | Scan for legacy name/path/status residue |
-| `scripts/scan_contract_drift.py` | Detect multiple competing sources of truth |
-| `scripts/summarize_impacts.py` | Aggregate scan results into impact summaries |
+| 脚本 | 用途 |
+|------|------|
+| `scripts/grep_legacy.py` | 扫描旧名称/旧路径/旧状态残留 |
+| `scripts/scan_contract_drift.py` | 检测多个竞争真源 |
+| `scripts/summarize_impacts.py` | 聚合扫描结果生成影响面摘要 |
 
-### Quick Examples
+### 使用示例
 
 ```bash
-# Find legacy residue
+# 扫描 legacy 残留
 python3 scripts/grep_legacy.py /path/to/project old_status_field legacy_module_name
 
-# Detect contract drift (multiple sources defining the same thing)
+# 检测契约漂移（多处定义同一个东西）
 python3 scripts/scan_contract_drift.py /path/to/project
 
-# Pipe grep results into impact summary
+# 管道：grep 结果 → 影响面摘要
 python3 scripts/grep_legacy.py /path/to/project old_name --json | \
   python3 scripts/summarize_impacts.py --source-of-truth config.py
 ```
 
-## Directory Structure
+## 目录结构
 
 ```
 architecture-consistency-guardian/
-├── SKILL.md                    # Core workflow and hard rules
+├── SKILL.md                    # 核心工作流与硬规则
 ├── references/
-│   ├── workflow.md             # Detailed workflow with decision branches
-│   ├── output_template.md      # Structured report template
-│   ├── risk_patterns.md        # 8 common consistency risk patterns
-│   └── contract_template.md    # Architecture contract template
+│   ├── workflow.md             # 详细工作流与决策分支
+│   ├── output_template.md      # 结构化报告模板
+│   ├── risk_patterns.md        # 8 种常见一致性风险模式
+│   └── contract_template.md    # 架构契约文档模板
 ├── templates/
 │   ├── consistency_report_template.md
 │   └── architecture_contract_template.md
@@ -75,15 +75,15 @@ architecture-consistency-guardian/
     └── summarize_impacts.py
 ```
 
-## Installation
+## 安装
 
-Copy the skill directory to your OpenClaw skills folder:
+复制到 OpenClaw skills 目录：
 
 ```bash
 cp -r architecture-consistency-guardian ~/.openclaw/skills/
 ```
 
-Or install from the `.skill` package:
+或通过 `.skill` 包安装：
 
 ```bash
 openclaw skill install architecture-consistency-guardian.skill
