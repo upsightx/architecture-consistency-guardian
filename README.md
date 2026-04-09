@@ -1,4 +1,4 @@
-# Architecture Consistency Guardian
+# Architecture Consistency Guardian 架构一致性守卫
 
 你的 AI 编程助手是不是也这样——修了一个 bug，却在三个文件里留下了旧变量名？改了状态机，但 fallback 还在偷偷把流量导回旧逻辑？
 
