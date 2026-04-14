@@ -84,8 +84,29 @@ python3 <skill_dir>/scripts/grep_legacy.py <directory> <pattern1> <pattern2> ...
 
 Use `scripts/scan_contract_drift.py` for multi-source detection:
 ```bash
-python3 <skill_dir>/scripts/scan_contract_drift.py <directory> [--pattern-file <file>]
+python3 <skill_dir>/scripts/scan_contract_drift.py <directory> [--pattern-file <file>] [--mode default|lite|strict]
 ```
+
+Mode guidance:
+- `default`: best general-purpose mode; ignores reference/template/test-only mentions as evidence
+- `lite`: same filtering as `default`, but down-ranks lower-risk categories for quick triage
+- `strict`: count every matching file, including references and tests, for forensic audits
+
+### Lite Mode
+
+For small consistency fixes touching only 2-3 files with one clear source of truth,
+you may run a lite variant of the workflow:
+
+1. Classify the task
+2. Identify the source of truth
+3. Run a scoped global reference scan
+4. Output a short modification plan
+5. Edit all affected files in one pass
+6. Run a residue search for the retired names/paths
+7. Verify with at least one focused check
+
+Use full 8-phase mode for state machines, schema changes, config paths, entry-point
+consolidation, or any task where multiple competing truths may exist.
 
 ### Phase 4 — Produce a Modification Plan
 
@@ -182,5 +203,5 @@ If you observe any of these recurring in a project, recommend creating an
 ## Scripts
 
 - `scripts/grep_legacy.py` — Scan directories for legacy name/path/status residue
-- `scripts/scan_contract_drift.py` — Detect multiple competing sources of truth
+- `scripts/scan_contract_drift.py` — Detect multiple competing sources of truth; supports `--mode default|lite|strict`
 - `scripts/summarize_impacts.py` — Aggregate scan results into an impact summary

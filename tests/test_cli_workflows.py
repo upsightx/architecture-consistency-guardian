@@ -103,6 +103,80 @@ def test_scan_does_not_flag_plain_main_functions_as_entry_point_drift(tmp_path):
     assert payload["summary"]["total_findings"] == 0
 
 
+def test_scan_ignores_reference_only_pattern_mentions(tmp_path):
+    project = tmp_path / "demo"
+    project.mkdir()
+    (project / "references").mkdir()
+    (project / "references" / "risk_patterns.md").write_text(
+        "lifecycle_status is an example legacy field.\n",
+        encoding="utf-8",
+    )
+    (project / "scripts").mkdir()
+    (project / "scripts" / "scan.py").write_text(
+        "PATTERNS = [r'lifecycle_status']\n",
+        encoding="utf-8",
+    )
+
+    scan_result = run_cli([
+        str(SCRIPTS_DIR / "scan_contract_drift.py"),
+        str(project),
+        "--json",
+    ])
+    assert scan_result.returncode == 0, scan_result.stderr
+
+    payload = json.loads(scan_result.stdout)
+    assert payload["summary"]["total_findings"] == 0
+
+
+def test_scan_strict_mode_counts_reference_mentions(tmp_path):
+    project = tmp_path / "demo"
+    project.mkdir()
+    (project / "references").mkdir()
+    (project / "references" / "risk_patterns.md").write_text(
+        "lifecycle_status is an example legacy field.\n",
+        encoding="utf-8",
+    )
+    (project / "scripts").mkdir()
+    (project / "scripts" / "scan.py").write_text(
+        "PATTERNS = [r'lifecycle_status']\n",
+        encoding="utf-8",
+    )
+
+    scan_result = run_cli([
+        str(SCRIPTS_DIR / "scan_contract_drift.py"),
+        str(project),
+        "--json",
+        "--mode",
+        "strict",
+    ])
+    assert scan_result.returncode == 0, scan_result.stderr
+
+    payload = json.loads(scan_result.stdout)
+    assert payload["summary"]["total_findings"] == 1
+    assert payload["results"][0]["files"] == ["references/risk_patterns.md", "scripts/scan.py"]
+
+
+def test_scan_lite_mode_down_ranks_lower_risk_categories(tmp_path):
+    project = tmp_path / "demo"
+    project.mkdir()
+    (project / "service_a.py").write_text("class DemoService:\n    pass\n", encoding="utf-8")
+    (project / "service_b.py").write_text("class DemoService:\n    pass\n", encoding="utf-8")
+
+    scan_result = run_cli([
+        str(SCRIPTS_DIR / "scan_contract_drift.py"),
+        str(project),
+        "--json",
+        "--mode",
+        "lite",
+    ])
+    assert scan_result.returncode == 0, scan_result.stderr
+
+    payload = json.loads(scan_result.stdout)
+    assert payload["summary"]["total_findings"] == 1
+    assert payload["results"][0]["category"] == "entry_point"
+    assert payload["results"][0]["severity"] == "low"
+
+
 def test_grep_invalid_regex_returns_structured_error(tmp_path):
     project = tmp_path / "demo"
     project.mkdir()

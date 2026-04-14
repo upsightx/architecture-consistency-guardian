@@ -62,6 +62,12 @@ DEFAULT_IGNORE_DIRS = {
     '.git', '__pycache__', 'node_modules', '.venv', 'venv',
     '.mypy_cache', '.pytest_cache', 'dist', 'build', '.egg-info',
 }
+NON_CANONICAL_DIR_HINTS = {'references', 'templates', 'assets', 'tests', 'fixtures'}
+
+
+def is_non_canonical_path(relpath):
+    parts = relpath.split(os.sep)
+    return any(part in NON_CANONICAL_DIR_HINTS for part in parts)
 
 
 def utc_now_iso():
@@ -142,24 +148,43 @@ def scan_for_drift(directory, compiled_patterns, extensions, ignore_dirs):
     return results, errors
 
 
-def analyze_drift(results):
+def analyze_drift(results, mode="default"):
     """Analyze results to find competing sources (same pattern in multiple files)."""
     drift_warnings = []
 
     for category, pattern_hits in results.items():
         for pat, hits in pattern_hits.items():
             files = sorted({h["filepath"] for h in hits})
-            if len(files) > 1:
-                severity = "high" if category in ("config_definition", "state_definition") else "medium"
-                evidence = sorted(hits, key=lambda item: (item["filepath"], item["line"]))[:10]
-                drift_warnings.append({
-                    "category": category,
-                    "pattern": pat,
-                    "files": files,
-                    "hit_count": len(hits),
-                    "severity": severity,
-                    "evidence": evidence,
-                })
+            if len(files) <= 1:
+                continue
+
+            if mode == "strict":
+                effective_hits = hits
+                ignored_hits = []
+            else:
+                effective_hits = [h for h in hits if not is_non_canonical_path(h["filepath"])]
+                ignored_hits = [h for h in hits if is_non_canonical_path(h["filepath"])]
+                effective_hits = effective_hits or hits
+
+            effective_files = sorted({h["filepath"] for h in effective_hits})
+            if len(effective_files) <= 1:
+                continue
+
+            severity = "high" if category in ("config_definition", "state_definition") else "medium"
+            if mode == "lite" and category in ("entry_point", "table_write"):
+                severity = "low"
+            evidence = sorted(effective_hits, key=lambda item: (item["filepath"], item["line"]))[:10]
+            warning = {
+                "category": category,
+                "pattern": pat,
+                "files": effective_files,
+                "hit_count": len(effective_hits),
+                "severity": severity,
+                "evidence": evidence,
+            }
+            if ignored_hits and effective_hits != hits:
+                warning["ignored_reference_files"] = sorted({h["filepath"] for h in ignored_hits})
+            drift_warnings.append(warning)
 
     severity_order = {"high": 0, "medium": 1, "low": 2}
     drift_warnings.sort(key=lambda w: (severity_order.get(w["severity"], 9), -w["hit_count"], w["category"]))
@@ -238,6 +263,8 @@ def main():
                         help="Directory names to skip")
     parser.add_argument("--json", action="store_true",
                         help="Output as JSON")
+    parser.add_argument("--mode", choices=("default", "lite", "strict"), default="default",
+                        help="default ignores reference/test evidence, lite also down-ranks lower-risk categories, strict counts all hits")
     parser.add_argument("--builtin-only", action="store_true",
                         help="Use only built-in patterns (ignore --pattern-file)")
 
@@ -275,7 +302,7 @@ def main():
         sys.exit(2)
 
     scan_results, errors = scan_for_drift(args.directory, compiled_patterns, extensions, ignore_dirs)
-    warnings = analyze_drift(scan_results)
+    warnings = analyze_drift(scan_results, mode=args.mode)
     payload = build_payload(args.directory, results=warnings, summary=build_summary(warnings), errors=errors)
 
     if args.json:
